@@ -1,0 +1,58 @@
+import os
+import cv2 as cv
+import numpy as np
+import matplotlib.pyplot as plt
+from datetime import datetime
+
+# Define o diretório onde as imagens estão armazenadas
+img_dir = "imagens"
+
+# Carrega todas as imagens da pasta
+img_paths = sorted([os.path.join(img_dir, f) for f in os.listdir(img_dir) if f.endswith('.jpg')])
+
+# Cria listas para armazenar as datas e os perímetros de cada imagem
+dates = []
+perimeters = []
+
+# Calcula o perímetro de cada imagem e armazena na lista, juntamente com a data
+for img_path in img_paths:
+    img = cv.imread(img_path, 0)
+    img_blur = cv.GaussianBlur(img, (5, 5), 0)
+    _, img_thresh = cv.threshold(img_blur, 0, 255, cv.THRESH_BINARY_INV+cv.THRESH_OTSU)
+    contours, hierarchy = cv.findContours(img_thresh, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    perimeter = 0
+    for contour in contours:
+        area = cv.contourArea(contour)
+        if area < 5000:
+            continue
+        perimeter += cv.arcLength(contour, True)
+    perimeters.append(perimeter)
+    date_str = os.path.splitext(os.path.basename(img_path))[0]
+    date = datetime.strptime(date_str, '%Y%m%d').date()
+    dates.append(date)
+
+    
+
+# Cria um gráfico com o tempo no eixo x e o perímetro no eixo y
+x = [datetime.combine(date, datetime.min.time()) for date in dates]
+y = perimeters
+coeffs = np.polyfit(range(len(x)), y, 1)
+trendline = np.poly1d(coeffs)
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(x, y, 'o', label='Perímetro')
+ax.plot(x, trendline(range(len(x))), '-', label='Tendência')
+ax.set_xlabel('Data')
+ax.set_ylabel('Perímetro')
+ax.set_title('Progressão do perímetro ao longo do tempo')
+ax.legend()
+
+# Adiciona cada imagem ao lado do gráfico
+for i, img_path in enumerate(img_paths):
+    img = cv.imread(img_path)
+    ax_img = fig.add_axes([1.05, 1 - 0.25 * (i + 1), 0.2, 0.2])
+    ax_img.imshow(cv.cvtColor(img, cv.COLOR_BGR2RGB))
+    ax_img.set_title(os.path.splitext(os.path.basename(img_path))[0])
+    ax_img.axis('off')
+
+   
+plt.show()
